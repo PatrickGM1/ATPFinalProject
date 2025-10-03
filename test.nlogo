@@ -16,7 +16,8 @@ zombies-own [ chasing-time ]
 ; -------------------------
 to go
   set-current-plot "Zombies vs. time"
-  plot count zombies
+  set-current-plot-pen "default"
+  plotxy ticks count zombies
 
   ; --- zombies ---
   ask zombies [
@@ -119,10 +120,13 @@ to setup-beings
 
   set-current-plot "Zombies vs. time"
   clear-plot
+  set-plot-x-range 0 1000
+  set-plot-y-range 0 (num-humans + num-zombies)
   reset-ticks
 
   ; zombies get earliest who numbers (relied on by uninfect)
   create-zombies num-zombies [
+    set size 4
     set chasing-time 0
     set color ifelse-value green-zombies? [ green ] [ gray ]
     setxy random-xcor random-ycor
@@ -131,6 +135,7 @@ to setup-beings
   ]
 
   create-humans num-humans [
+    set size 4
     set panic-time 0
     set color magenta
     setxy random-xcor random-ycor
@@ -266,7 +271,7 @@ num-humans
 num-humans
 0
 1000
-41.0
+510.0
 1
 1
 NIL
@@ -281,7 +286,7 @@ num-zombies
 num-zombies
 0
 64
-8.0
+58.0
 1
 1
 NIL
@@ -294,7 +299,7 @@ SWITCH
 453
 wrap?
 wrap?
-1
+0
 1
 -1000
 
@@ -398,7 +403,7 @@ true
 false
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot count turtles"
+"default" 1.0 2 -14439633 true "" "plot count turtles"
 
 BUTTON
 100
