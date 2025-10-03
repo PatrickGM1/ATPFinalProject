@@ -146,10 +146,11 @@ to setup-town
   clear-patches
   ask patches [ set pcolor gray - 3 ]  ; buildings
 
-  ; carve alleyways with paired diggers so we avoid dead ends
+  ;; carve alleyways with paired diggers so we avoid dead ends
   clear-turtles
   create-diggers 112
 
+  ; place digger pairs back-to-back on the grid and align to 90° headings
   ask diggers with [ who mod 2 = 0 ] [
     setxy random-xcor random-ycor
     set heading 90 * random 4
@@ -160,31 +161,29 @@ to setup-town
     fd 1
   ]
 
+  ; each digger walks, carving black corridors, randomly turning by 90° or 270°
   ask diggers [
     while [ [pcolor] of patch-here != black ] [
       set pcolor black
       fd 1
-      if random-float 1 < (1 / 30) [ lt (90 + 180 * random 2) ]
+      if random-float 1 < (1 / 30) [
+        lt (90 + 180 * random 2)
+      ]
     ]
   ]
 
-  ; carve squares (plazas)
+  ;; carve plazas (squares)
   clear-turtles
-  ; carve plazas (squares)
   create-diggers 56 [
     setxy random-xcor random-ycor
     let xsize 2 + random 60
     let ysize 2 + random 60
-    ; loop explicitly over x and y
     (foreach n-values xsize [ i -> i ] [ x ->
       foreach n-values ysize [ j -> j ] [ y ->
         ask patch-at x y [ set pcolor black ]
       ]
     ])
   ]
-
-
-
 
   clear-turtles
 
@@ -196,17 +195,23 @@ to setup-town
 
   reset-ticks
 end
+
+
+
+to reset-world
+  ca
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
 10
-647
-448
+821
+622
 -1
 -1
-13.0
+3.0
 1
-10
+15
 1
 1
 1
@@ -214,10 +219,10 @@ GRAPHICS-WINDOW
 1
 1
 1
--16
-16
--16
-16
+-100
+100
+-100
+100
 0
 0
 1
@@ -242,10 +247,10 @@ NIL
 1
 
 SWITCH
-0
-357
-159
-390
+18
+355
+177
+388
 green-zombies?
 green-zombies?
 1
@@ -253,40 +258,40 @@ green-zombies?
 -1000
 
 SLIDER
-0
-230
-172
-263
+18
+228
+190
+261
 num-humans
 num-humans
 0
 1000
-543.0
+41.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-0
-288
-172
-321
+18
+286
+190
+319
 num-zombies
 num-zombies
 0
 64
-4.0
+8.0
 1
 1
 NIL
 HORIZONTAL
 
 SWITCH
-0
-422
-103
-455
+18
+420
+121
+453
 wrap?
 wrap?
 1
@@ -345,9 +350,9 @@ NIL
 1
 
 MONITOR
-728
+831
 177
-828
+931
 222
 NIL
 count humans
@@ -356,9 +361,9 @@ count humans
 11
 
 MONITOR
-727
+830
 88
-828
+931
 133
 NIL
 count zombies
@@ -367,9 +372,9 @@ count zombies
 11
 
 MONITOR
-729
+832
 20
-962
+1065
 65
 NIL
 count humans with [ panic-time > 0 ]
@@ -378,10 +383,10 @@ count humans with [ panic-time > 0 ]
 11
 
 PLOT
-1053
-20
-1658
-496
+1088
+19
+1693
+495
 Zombies vs. time
 Time
 Zombies
@@ -394,6 +399,40 @@ false
 "" ""
 PENS
 "default" 1.0 0 -16777216 true "" "plot count turtles"
+
+BUTTON
+100
+63
+203
+96
+NIL
+setup-town
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+39
+508
+144
+541
+NIL
+reset-world
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
