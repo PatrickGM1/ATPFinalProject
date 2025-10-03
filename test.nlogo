@@ -7,6 +7,8 @@ breed [ diggers digger ]
 breed [ humans human ]
 breed [ zombies zombie ]
 
+globals [ stop-reason ]
+
 ; per-breed state
 humans-own  [ panic-time ]
 zombies-own [ chasing-time ]
@@ -71,8 +73,17 @@ to go
     ]
   ]
 
+  if count humans = 0 [
+    set stop-reason (word "All humans infected at tick " ticks)
+    stop
+  ]
+  if ticks >= 5000 [
+    set stop-reason "Reached 5000 ticks"
+    stop
+  ]
+
   tick
-  wait 0.05
+  ;wait 0.02
 end
 
 ; -------------------------
@@ -111,6 +122,7 @@ end
 ; setup wrappers
 ; -------------------------
 to setup
+  set stop-reason ""
   setup-town
   setup-beings
 end
@@ -258,7 +270,7 @@ SWITCH
 388
 green-zombies?
 green-zombies?
-1
+0
 1
 -1000
 
@@ -271,7 +283,7 @@ num-humans
 num-humans
 0
 1000
-510.0
+1.0
 1
 1
 NIL
@@ -285,8 +297,8 @@ SLIDER
 num-zombies
 num-zombies
 0
-64
-58.0
+100
+100.0
 1
 1
 NIL
@@ -299,7 +311,7 @@ SWITCH
 453
 wrap?
 wrap?
-0
+1
 1
 -1000
 
@@ -438,6 +450,17 @@ NIL
 NIL
 NIL
 1
+
+MONITOR
+211
+628
+399
+673
+Why stopped
+stop-reason
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
