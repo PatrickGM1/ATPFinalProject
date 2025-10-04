@@ -77,9 +77,11 @@ to go
     set stop-reason (word "All humans infected at tick " ticks)
     stop
   ]
-  if ticks >= 5000 [
-    set stop-reason "Reached 5000 ticks"
-    stop
+  if force-stop = true [
+    if ticks >= simulation-time [
+      set stop-reason (word "Simulation ended by reaching " ticks " ticks")
+      stop
+    ]
   ]
 
   tick
@@ -454,13 +456,39 @@ NIL
 MONITOR
 211
 628
-399
+422
 673
 Why stopped
 stop-reason
 17
 1
 11
+
+SWITCH
+441
+634
+554
+667
+force-stop
+force-stop
+0
+1
+-1000
+
+SLIDER
+587
+634
+759
+667
+simulation-time
+simulation-time
+100
+10000
+100.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
