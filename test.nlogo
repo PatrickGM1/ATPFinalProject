@@ -266,10 +266,10 @@ NIL
 1
 
 SWITCH
-18
-355
-177
-388
+22
+306
+181
+339
 green-zombies?
 green-zombies?
 0
@@ -277,40 +277,40 @@ green-zombies?
 -1000
 
 SLIDER
-18
-228
-190
-261
+22
+207
+194
+240
 num-humans
 num-humans
 0
 1000
-1.0
+242.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-18
-286
-190
-319
+21
+257
+193
+290
 num-zombies
 num-zombies
 0
 100
-100.0
+54.0
 1
 1
 NIL
 HORIZONTAL
 
 SWITCH
-18
-420
-121
-453
+21
+358
+124
+391
 wrap?
 wrap?
 1
@@ -335,10 +335,10 @@ NIL
 1
 
 BUTTON
-20
-118
-134
-151
+25
+111
+139
+144
 NIL
 setup-beings
 NIL
@@ -352,10 +352,10 @@ NIL
 1
 
 BUTTON
-16
-170
-99
-203
+21
+410
+104
+443
 NIL
 uninfect
 NIL
@@ -369,10 +369,10 @@ NIL
 1
 
 MONITOR
-831
-177
-931
-222
+832
+86
+932
+131
 NIL
 count humans
 17
@@ -380,10 +380,10 @@ count humans
 11
 
 MONITOR
-830
-88
-931
-133
+965
+84
+1066
+129
 NIL
 count zombies
 17
@@ -402,10 +402,10 @@ count humans with [ panic-time > 0 ]
 11
 
 PLOT
-1088
-19
-1693
-495
+1089
+20
+1694
+496
 Zombies vs. time
 Time
 Zombies
@@ -420,10 +420,10 @@ PENS
 "default" 1.0 2 -14439633 true "" "plot count turtles"
 
 BUTTON
-100
-63
-203
-96
+25
+158
+128
+191
 NIL
 setup-town
 NIL
@@ -437,10 +437,10 @@ NIL
 1
 
 BUTTON
-39
-508
-144
-541
+20
+459
+125
+492
 NIL
 reset-world
 NIL
@@ -471,7 +471,7 @@ SWITCH
 667
 force-stop
 force-stop
-0
+1
 1
 -1000
 
