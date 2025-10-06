@@ -10,8 +10,18 @@ breed [ zombies zombie ]
 globals [ stop-reason ]
 
 ; per-breed state
-humans-own  [ panic-time ]
-zombies-own [ chasing-time ]
+humans-own  [
+  panic-time
+  infection-timer
+]
+zombies-own [
+  chasing-time
+  ztype        ; "normal" | "speedy" | "tanky"
+  z-speed      ; movement per tick
+  z-damage     ; reserved for future combat
+  z-health     ; reserved for future combat
+  z-color      ; visual green shade
+]
 
 ; -------------------------
 ; main loop
@@ -23,7 +33,7 @@ to go
 
   ; --- zombies ---
   ask zombies [
-    set color ifelse-value green-zombies? [ green ] [ gray ]
+    set color z-color
 
     ifelse chasing-time > 0
     [ set chasing-time chasing-time - 1 ]
@@ -41,38 +51,63 @@ to go
       ]
     ]
 
-    step 0.2
+    ; move by per-type speed
+    step z-speed
 
     ; infect any humans on the same patch
     ask humans-here [
-      set breed zombies
-      set chasing-time 0
-      set color ifelse-value green-zombies? [ green ] [ gray ]
+      if infection-timer = 0 [
+        set infection-timer 200           ; infection delay (in ticks)
+        set color red + 2                ; light red to show bitten
+      ]
     ]
   ]
 
   ; --- humans ---
   ask humans [
-    step 1
-
-    if panic-time > 0 [
-      set panic-time panic-time - 1
-      if panic-time = 0 [ set color magenta ]
-      step 1  ; panicked humans keep moving faster for this tick too
+    ; infection progression first
+    if infection-timer > 0 [
+      set infection-timer infection-timer - 1
+      if infection-timer = 0 [
+        ; transform now
+        set breed zombies
+        set chasing-time 0
+        init-zombie-type
+        set color z-color
+      ]
     ]
 
-    ; look ahead only every 5 ticks, staggered by who
-    if (who - ticks) mod 5 = 0 [
-      let beings-seen turtles in-cone 10 45
-        with [ self != myself and (breed = zombies or (breed = humans and panic-time > 0)) ]
-      if any? beings-seen [
-        lt 157.5 + random-float 45
-        set color magenta + 3
-        set panic-time 10
+    ; After possible transform, only run human behavior if still human
+    if breed = humans [
+      step 0.22  ; normal human speed
+
+      if panic-time > 0 [
+        set panic-time panic-time - 1
+        if panic-time = 0 [
+          ; return to correct color after panic ends
+          ifelse infection-timer > 0 [
+            set color red + 2            ; still infected, back to light red
+          ] [
+            set color magenta            ; not infected, normal human
+          ]
+        ]
+        step 0.28  ; panicked humans move faster for this tick too
+      ]
+
+      ; look ahead only every 5 ticks, staggered by who
+      if (who - ticks) mod 5 = 0 [
+        let beings-seen turtles in-cone 10 45
+          with [ self != myself and (breed = zombies or (breed = humans and panic-time > 0)) ]
+        if any? beings-seen [
+          lt 157.5 + random-float 45
+          set color magenta + 3
+          set panic-time 10
+        ]
       ]
     ]
   ]
 
+  ; stopping conditions
   if count humans = 0 [
     set stop-reason (word "All humans infected at tick " ticks)
     stop
@@ -85,8 +120,10 @@ to go
   ]
 
   tick
-  ;wait 0.02
+  wait 0.01
 end
+
+
 
 ; -------------------------
 ; motion helper (avoid walls)
@@ -103,6 +140,37 @@ to step [dist]
 end
 
 ; -------------------------
+; assign a random zombie type (called on spawn & on infection)
+; -------------------------
+to init-zombie-type
+  let r random-float 1
+  if r < 0.5 [
+    ; NORMAL: baseline stats, mid green
+    set ztype   "normal"
+    set z-speed 0.20
+    set z-damage 1.0
+    set z-health 1.0
+    set z-color green
+  ]
+  if r >= 0.5 and r < 0.8 [
+    ; SPEEDY: faster but less damage, lighter green
+    set ztype   "speedy"
+    set z-speed 0.25
+    set z-damage 0.6
+    set z-health 1.0
+    set z-color green + 2
+  ]
+  if r >= 0.8 [
+    ; TANKY: slower, less health, darker green
+    set ztype   "tanky"
+    set z-speed 0.15
+    set z-damage 1.0
+    set z-health 0.7
+    set z-color green - 2
+  ]
+end
+
+; -------------------------
 ; “uninfect” (reset mix to slider value)
 ; -------------------------
 to uninfect
@@ -116,7 +184,8 @@ to uninfect
   ask humans with [ who < num-zombies ] [
     set breed zombies
     set chasing-time 0
-    set color ifelse-value green-zombies? [ green ] [ gray ]
+    init-zombie-type
+    set color z-color
   ]
 end
 
@@ -142,19 +211,21 @@ to setup-beings
   create-zombies num-zombies [
     set size 4
     set chasing-time 0
-    set color ifelse-value green-zombies? [ green ] [ gray ]
+    init-zombie-type
+    set color z-color
     setxy random-xcor random-ycor
     set heading random-float 360
-    while [ [pcolor] of patch-here != black ] [ fd 1 ]   ; start on corridor
+    while [ [pcolor] of patch-here != black ] [ fd 1 ]
   ]
 
   create-humans num-humans [
     set size 4
     set panic-time 0
+    set infection-timer 0
     set color magenta
     setxy random-xcor random-ycor
     set heading random-float 360
-    while [ [pcolor] of patch-here != black ] [ fd 1 ]   ; start on corridor
+    while [ [pcolor] of patch-here != black ] [ fd 1 ]
   ]
 end
 
@@ -215,8 +286,6 @@ to setup-town
   reset-ticks
 end
 
-
-
 to reset-world
   ca
 end
@@ -265,17 +334,6 @@ NIL
 NIL
 1
 
-SWITCH
-22
-306
-181
-339
-green-zombies?
-green-zombies?
-0
-1
--1000
-
 SLIDER
 22
 207
@@ -285,7 +343,7 @@ num-humans
 num-humans
 0
 1000
-242.0
+26.0
 1
 1
 NIL
@@ -300,7 +358,7 @@ num-zombies
 num-zombies
 0
 100
-54.0
+99.0
 1
 1
 NIL
@@ -308,9 +366,9 @@ HORIZONTAL
 
 SWITCH
 21
-358
+310
 124
-391
+343
 wrap?
 wrap?
 1
@@ -353,9 +411,9 @@ NIL
 
 BUTTON
 21
-410
+362
 104
-443
+395
 NIL
 uninfect
 NIL
@@ -438,9 +496,9 @@ NIL
 
 BUTTON
 20
-459
+411
 125
-492
+444
 NIL
 reset-world
 NIL
