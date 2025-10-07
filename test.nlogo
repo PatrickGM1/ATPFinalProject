@@ -7,20 +7,38 @@ breed [ diggers digger ]
 breed [ humans human ]
 breed [ zombies zombie ]
 
-globals [ stop-reason ]
+globals [
+  stop-reason
+
+  ;; --- combat tunables ---
+  infection-delay        ;; ticks to turn after being infected
+  p-z-infect             ;; zombie attack: chance to infect + deal damage
+  p-z-damage             ;; zombie attack: chance to deal damage only
+  p-h-hit                ;; human attack: chance to hit (damage only)
+  human-base-hp
+  zombie-base-hp
+  human-base-damage
+
+  ;; --- counters ---
+  human-deaths-combat
+  zombie-deaths
+]
 
 ; per-breed state
 humans-own  [
   panic-time
   infection-timer
+  hp
+  h-damage
 ]
 zombies-own [
   chasing-time
   ztype        ; "normal" | "speedy" | "tanky"
   z-speed      ; movement per tick
-  z-damage     ; reserved for future combat
-  z-health     ; reserved for future combat
+  z-damage     ; damage dealt on hit
+  z-health     ; HP multiplier
   z-color      ; visual green shade
+  hp
 ]
 
 ; -------------------------
@@ -54,11 +72,13 @@ to go
     ; move by per-type speed
     step z-speed
 
-    ; infect any humans on the same patch
-    ask humans-here [
-      if infection-timer = 0 [
-        set infection-timer 200           ; infection delay (in ticks)
-        set color red + 2                ; light red to show bitten
+    ; --- COMBAT: attack one human on the same patch, then allow counterattack ---
+    let target one-of humans-here
+    if target != nobody [
+      zombie-attack target
+      ; if the human survived and is still human, they counterattack
+      if target != nobody and [breed] of target = humans [
+        ask target [ human-attack myself ]
       ]
     ]
   ]
@@ -74,6 +94,7 @@ to go
         set chasing-time 0
         init-zombie-type
         set color z-color
+        set hp zombie-base-hp * z-health   ;; give fresh zombie HP on turn
       ]
     ]
 
@@ -97,7 +118,7 @@ to go
       ; look ahead only every 5 ticks, staggered by who
       if (who - ticks) mod 5 = 0 [
         let beings-seen turtles in-cone 10 45
-          with [ self != myself and (breed = zombies or (breed = humans and panic-time > 0)) ]
+          with [ self != myself and breed = zombies ]
         if any? beings-seen [
           lt 157.5 + random-float 45
           set color magenta + 3
@@ -120,7 +141,7 @@ to go
   ]
 
   tick
-  wait 0.01
+  ;wait 0.01
 end
 
 
@@ -171,6 +192,55 @@ to init-zombie-type
 end
 
 ; -------------------------
+; COMBAT HELPERS
+; -------------------------
+to zombie-attack [h]  ;; called by a zombie, h is a human turtle
+  let roll random-float 1
+  let dmg z-damage
+
+  if roll < p-z-infect [
+    ;; infect + damage
+    ask h [
+      if infection-timer = 0 [
+        set infection-timer infection-delay
+        set color red + 2
+      ]
+      set hp hp - dmg
+      if hp <= 0 [ die-human-combat ]
+    ]
+  ]
+  if roll >= p-z-infect and roll < (p-z-infect + p-z-damage) [
+    ;; damage only
+    ask h [
+      set hp hp - dmg
+      if hp <= 0 [ die-human-combat ]
+    ]
+  ]
+  ;; else: miss (do nothing)
+end
+
+to human-attack [z]  ;; called by a human, z is a zombie turtle
+  let roll random-float 1
+  if roll < p-h-hit [
+    let dmg h-damage
+    ask z [
+      set hp hp - dmg
+      if hp <= 0 [ die-zombie ]
+    ]
+  ]
+end
+
+to die-human-combat
+  set human-deaths-combat human-deaths-combat + 1
+  die
+end
+
+to die-zombie
+  set zombie-deaths zombie-deaths + 1
+  die
+end
+
+; -------------------------
 ; “uninfect” (reset mix to slider value)
 ; -------------------------
 to uninfect
@@ -179,6 +249,9 @@ to uninfect
     set breed humans
     set panic-time 0
     set color magenta
+    set infection-timer 0
+    set hp human-base-hp
+    set h-damage human-base-damage
   ]
   ; if the slider was increased, promote the lowest who # humans to zombies
   ask humans with [ who < num-zombies ] [
@@ -186,6 +259,8 @@ to uninfect
     set chasing-time 0
     init-zombie-type
     set color z-color
+    set infection-timer 0
+    set hp zombie-base-hp * z-health
   ]
 end
 
@@ -194,6 +269,19 @@ end
 ; -------------------------
 to setup
   set stop-reason ""
+
+  ;; ---- combat defaults (tweak to taste) ----
+  set infection-delay     200
+  set p-z-infect          0.30   ;; 30% infect + damage
+  set p-z-damage          0.50   ;; 50% damage-only
+  set p-h-hit             0.55   ;; 55% human hit chance
+  set human-base-hp       10
+  set zombie-base-hp      10
+  set human-base-damage    1.0
+
+  set human-deaths-combat 0
+  set zombie-deaths       0
+
   setup-town
   setup-beings
 end
@@ -213,6 +301,7 @@ to setup-beings
     set chasing-time 0
     init-zombie-type
     set color z-color
+    set hp zombie-base-hp * z-health
     setxy random-xcor random-ycor
     set heading random-float 360
     while [ [pcolor] of patch-here != black ] [ fd 1 ]
@@ -223,6 +312,8 @@ to setup-beings
     set panic-time 0
     set infection-timer 0
     set color magenta
+    set hp human-base-hp
+    set h-damage human-base-damage
     setxy random-xcor random-ycor
     set heading random-float 360
     while [ [pcolor] of patch-here != black ] [ fd 1 ]
@@ -343,7 +434,7 @@ num-humans
 num-humans
 0
 1000
-26.0
+1000.0
 1
 1
 NIL
@@ -358,7 +449,7 @@ num-zombies
 num-zombies
 0
 100
-99.0
+1.0
 1
 1
 NIL
@@ -547,6 +638,28 @@ simulation-time
 1
 NIL
 HORIZONTAL
+
+MONITOR
+832
+149
+970
+194
+NIL
+human-deaths-combat
+17
+1
+11
+
+MONITOR
+982
+149
+1076
+194
+NIL
+zombie-deaths
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
