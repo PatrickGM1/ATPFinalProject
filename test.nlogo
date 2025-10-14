@@ -3,7 +3,7 @@
 ; -------------------------
 
 ; breeds
-breed [ diggers digger ]
+breed [ builders builder ]
 breed [ humans human ]
 breed [ zombies zombie ]
 
@@ -141,7 +141,7 @@ to go
   ]
 
   tick
-  ;wait 0.01
+  wait 0.01
 end
 
 
@@ -169,7 +169,7 @@ to init-zombie-type
     ; NORMAL: baseline stats, mid green
     set ztype   "normal"
     set z-speed 0.20
-    set z-damage 1.0
+    set z-damage 2.0
     set z-health 1.0
     set z-color green
   ]
@@ -177,7 +177,7 @@ to init-zombie-type
     ; SPEEDY: faster but less damage, lighter green
     set ztype   "speedy"
     set z-speed 0.25
-    set z-damage 0.6
+    set z-damage 1.0
     set z-health 1.0
     set z-color green + 2
   ]
@@ -185,7 +185,7 @@ to init-zombie-type
     ; TANKY: slower, less health, darker green
     set ztype   "tanky"
     set z-speed 0.15
-    set z-damage 1.0
+    set z-damage 2.0
     set z-health 0.7
     set z-color green - 2
   ]
@@ -263,7 +263,7 @@ to uninfect
     set hp zombie-base-hp * z-health
   ]
 end
-
+;test
 ; -------------------------
 ; setup wrappers
 ; -------------------------
@@ -275,9 +275,9 @@ to setup
   set p-z-infect          0.30   ;; 30% infect + damage
   set p-z-damage          0.50   ;; 50% damage-only
   set p-h-hit             0.55   ;; 55% human hit chance
-  set human-base-hp       10
+  set human-base-hp       20
   set zombie-base-hp      10
-  set human-base-damage    1.0
+  set human-base-damage    5.0
 
   set human-deaths-combat 0
   set zombie-deaths       0
@@ -327,23 +327,23 @@ to setup-town
   clear-patches
   ask patches [ set pcolor gray - 3 ]  ; buildings
 
-  ;; carve alleyways with paired diggers so we avoid dead ends
+  ;; carve alleyways with paired builders so we avoid dead ends
   clear-turtles
-  create-diggers 112
+  create-builders 112
 
-  ; place digger pairs back-to-back on the grid and align to 90° headings
-  ask diggers with [ who mod 2 = 0 ] [
+  ; place builder pairs back-to-back on the grid and align to 90° headings
+  ask builders with [ who mod 2 = 0 ] [
     setxy random-xcor random-ycor
     set heading 90 * random 4
   ]
-  ask diggers with [ who mod 2 = 1 ] [
+  ask builders with [ who mod 2 = 1 ] [
     setxy [xcor] of turtle (who - 1) [ycor] of turtle (who - 1)
     set heading (180 + [heading] of turtle (who - 1))
     fd 1
   ]
 
-  ; each digger walks, carving black corridors, randomly turning by 90° or 270°
-  ask diggers [
+  ; each builder walks, carving black corridors, randomly turning by 90° or 270°
+  ask builders [
     while [ [pcolor] of patch-here != black ] [
       set pcolor black
       fd 1
@@ -355,7 +355,7 @@ to setup-town
 
   ;; carve plazas (squares)
   clear-turtles
-  create-diggers 56 [
+  create-builders 56 [
     setxy random-xcor random-ycor
     let xsize 2 + random 60
     let ysize 2 + random 60
@@ -434,7 +434,7 @@ num-humans
 num-humans
 0
 1000
-1000.0
+255.0
 1
 1
 NIL
@@ -449,7 +449,7 @@ num-zombies
 num-zombies
 0
 100
-1.0
+54.0
 1
 1
 NIL
