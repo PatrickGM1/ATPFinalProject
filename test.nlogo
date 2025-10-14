@@ -186,7 +186,7 @@ to init-zombie-type
     set ztype   "tanky"
     set z-speed 0.15
     set z-damage 2.0
-    set z-health 0.7
+    set z-health 13
     set z-color green - 2
   ]
 end
