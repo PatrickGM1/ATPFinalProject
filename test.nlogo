@@ -19,7 +19,7 @@ globals [
   zombie-base-hp
   human-base-damage
 
-  ;; --- counters ---
+  ;; --- counters --
   human-deaths-combat
   zombie-deaths
 
@@ -868,7 +868,7 @@ MONITOR
 834
 214
 924
-260
+259
 NIL
 initial-loners
 17
@@ -879,7 +879,7 @@ MONITOR
 952
 215
 1061
-261
+260
 NIL
 initial-groupers
 17
@@ -890,7 +890,7 @@ MONITOR
 834
 280
 918
-326
+325
 NIL
 alive-loners
 17
@@ -901,7 +901,7 @@ MONITOR
 952
 277
 1055
-323
+322
 NIL
 alive-groupers
 17
