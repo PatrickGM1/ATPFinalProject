@@ -33,11 +33,9 @@ humans-own  [
 ]
 zombies-own [
   chasing-time
-  ztype        ; "normal" | "speedy" | "tanky"
-  z-speed      ; movement per tick
-  z-damage     ; damage dealt on hit
-  z-health     ; HP multiplier
-  z-color      ; visual green shade
+  z-speed      ; movement per tick (constant now)
+  z-damage     ; damage dealt on hit (constant now)
+  z-health     ; HP multiplier (1.0 now)
   hp
 ]
 
@@ -51,7 +49,7 @@ to go
 
   ; --- zombies ---
   ask zombies [
-    set color z-color
+    set color green
 
     ifelse chasing-time > 0
     [ set chasing-time chasing-time - 1 ]
@@ -69,7 +67,7 @@ to go
       ]
     ]
 
-    ; move by per-type speed
+    ; move by per-zombie speed (constant)
     step z-speed
 
     ; --- COMBAT: attack one human on the same patch, then allow counterattack ---
@@ -92,8 +90,11 @@ to go
         ; transform now
         set breed zombies
         set chasing-time 0
-        init-zombie-type
-        set color z-color
+        ;; assign normal zombie stats
+        set z-speed  0.20
+        set z-damage 2.0
+        set z-health 1.0
+        set color green
         set hp zombie-base-hp * z-health   ;; give fresh zombie HP on turn
       ]
     ]
@@ -158,37 +159,6 @@ to step [dist]
     face min-one-of neighbors4 with [ pcolor = black ] [ distancexy x y ]
   ]
   fd dist
-end
-
-; -------------------------
-; assign a random zombie type (called on spawn & on infection)
-; -------------------------
-to init-zombie-type
-  let r random-float 1
-  if r < 0.5 [
-    ; NORMAL: baseline stats, mid green
-    set ztype   "normal"
-    set z-speed 0.20
-    set z-damage 2.0
-    set z-health 1.0
-    set z-color green
-  ]
-  if r >= 0.5 and r < 0.8 [
-    ; SPEEDY: faster but less damage, lighter green
-    set ztype   "speedy"
-    set z-speed 0.25
-    set z-damage 1.0
-    set z-health 1.0
-    set z-color green + 2
-  ]
-  if r >= 0.8 [
-    ; TANKY: slower, less health, darker green
-    set ztype   "tanky"
-    set z-speed 0.15
-    set z-damage 2.0
-    set z-health 13
-    set z-color green - 2
-  ]
 end
 
 ; -------------------------
@@ -257,13 +227,16 @@ to uninfect
   ask humans with [ who < num-zombies ] [
     set breed zombies
     set chasing-time 0
-    init-zombie-type
-    set color z-color
+    ;; assign normal zombie stats
+    set z-speed  0.20
+    set z-damage 2.0
+    set z-health 1.0
+    set color green
     set infection-timer 0
     set hp zombie-base-hp * z-health
   ]
 end
-;test
+
 ; -------------------------
 ; setup wrappers
 ; -------------------------
@@ -299,8 +272,11 @@ to setup-beings
   create-zombies num-zombies [
     set size 4
     set chasing-time 0
-    init-zombie-type
-    set color z-color
+    ;; assign normal zombie stats
+    set z-speed  0.20
+    set z-damage 2.0
+    set z-health 1.0
+    set color green
     set hp zombie-base-hp * z-health
     setxy random-xcor random-ycor
     set heading random-float 360
@@ -434,7 +410,7 @@ num-humans
 num-humans
 0
 1000
-255.0
+1.0
 1
 1
 NIL
@@ -449,7 +425,7 @@ num-zombies
 num-zombies
 0
 100
-54.0
+100.0
 1
 1
 NIL
