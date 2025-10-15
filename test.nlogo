@@ -1,5 +1,5 @@
 ; -------------------------
-; Zombies vs Humans (NL 6.4) + Efficient Grouping + Spacing + Leader Dedupe + Fear Factor (with 5-tick decay)
+; Zombies vs Humans (NL 6.4) + Efficient Grouping + Spacing + Leader Dedupe + Fear Factor (with 5-tick decay) + Feared Plot
 ; -------------------------
 
 ; breeds
@@ -121,34 +121,29 @@ to go
       ;; Fades after 5 ticks since last fear stimulus.
       ;; Color returns to normal when fear fully decays.
       ;; -------------------------
-
       let zombies-seen count (zombies in-cone 10 45)
       let missing-health max (list 0 (human-base-hp - hp))
       let gsize (ifelse-value (group-id != -1)
-        [ count humans with [ group-id = [group-id] of myself ] ]
-        [ 0 ])
+                   [ count humans with [ group-id = [group-id] of myself ] ]
+                   [ 0 ])
       let base-fear max (list 0 ((zombies-seen + missing-health - gsize) * 0.02))
 
-      ;; fear only refreshes if zombies are actually seen
+      ;; Only seeing zombies refreshes the 5-tick fear timer.
       ifelse zombies-seen > 0 [
         set fear-factor base-fear
         set fear-time 5
         set color magenta + 3   ;; visibly afraid
       ] [
-        ;; no new stimulus, count down fear timer
+        ;; no stimulus: count down and clear after exactly 5 ticks
         if fear-time > 0 [
           set fear-time fear-time - 1
-          ;; optional gradual fade of fear intensity
-          ;; set fear-factor fear-factor * 0.8
           if fear-time = 0 [
             set fear-factor 0
-            ;; calm color returns to normal human color
+            ;; calm color returns to normal state
             ifelse infection-timer > 0 [ set color red + 2 ] [ set color magenta ]
           ]
         ]
       ]
-
-
 
       ;; GROUP BEHAVIOR: spacing + following
       let grouped (group-id != -1 and grouping?)
@@ -203,6 +198,11 @@ to go
   if ticks mod (group-scan-period * 2) = 0 [ maintain-groups ]
 
   update-grouping-stats
+
+  ;; --- plot feared humans over time ---
+  set-current-plot "Feared vs. time"
+  set-current-plot-pen "feared"
+  plotxy ticks count humans with [ fear-factor > 0 ]
 
   ; stopping conditions
   if count humans = 0 [
@@ -492,6 +492,7 @@ end
 to setup-beings
   clear-turtles
 
+  ;; --- existing plot: Zombies vs. time ---
   set-current-plot "Zombies vs. time"
   clear-plot
   set-plot-x-range 0 1000
@@ -545,6 +546,13 @@ to setup-beings
   set-current-plot "Zombies vs. time"
   create-temporary-plot-pen "groupers"
   create-temporary-plot-pen "loners"
+
+  ;; --- new plot: Feared vs. time ---
+  set-current-plot "Feared vs. time"
+  clear-plot
+  set-plot-x-range 0 1000
+  set-plot-y-range 0 num-humans
+  create-temporary-plot-pen "feared"
 end
 
 to update-grouping-stats
@@ -789,10 +797,10 @@ count humans with [ panic-time > 0 ]
 11
 
 PLOT
-1089
-20
-1694
-496
+1158
+21
+1589
+317
 Zombies vs. time
 Time
 Zombies
@@ -957,6 +965,24 @@ alive-groupers
 17
 1
 11
+
+PLOT
+1132
+331
+1598
+659
+Feared vs. time
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -3508570 true "" "plotxy ticks count humans with [ fear-factor > 0 ]"
 
 @#$#@#$#@
 ## WHAT IS IT?
