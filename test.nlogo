@@ -26,6 +26,13 @@ globals [
   ;; --- grouping controls ---
   group-min-dist           ;; spacing inside groups
   group-scan-period        ;; how often (in ticks) to run grouping logic
+
+  ;; --- grouping stats (for monitors & plot) ---
+  initial-loners
+  initial-groupers
+  alive-loners
+  alive-groupers
+
 ]
 
 ; per-breed state
@@ -152,6 +159,7 @@ to go
   ;; periodic upkeep (cap sizes, elect canonical leader per group-id)
   if ticks mod (group-scan-period * 2) = 0 [ maintain-groups ]
 
+  update-grouping-stats
   ; stopping conditions
   if count humans = 0 [
     set stop-reason (word "All humans infected at tick " ticks)
@@ -474,6 +482,34 @@ to setup-beings
     set heading random-float 360
     while [ [pcolor] of patch-here != black ] [ fd 1 ]
   ]
+
+  ;; --- grouping stats at spawn ---
+  set initial-groupers count humans with [ grouping? ]
+  set initial-loners   count humans with [ not grouping? ]
+  set alive-groupers initial-groupers
+  set alive-loners   initial-loners
+
+  ;; --- plotting: add two pens on existing plot ---
+  set-current-plot "Zombies vs. time"
+  ;; we already do clear-plot above; now add pens for groupers/loners
+  create-temporary-plot-pen "groupers"
+  create-temporary-plot-pen "loners"
+
+end
+
+to update-grouping-stats
+  set alive-groupers count humans with [ grouping? ]
+  set alive-loners   count humans with [ not grouping? ]
+
+  ;; plot on the existing plot using dedicated pens
+  set-current-plot "Zombies vs. time"
+  set-current-plot-pen "groupers"
+  plotxy ticks alive-groupers
+  set-current-plot-pen "loners"
+  plotxy ticks alive-loners
+
+  ;; (optional) switch back to default pen the zombies line uses
+  set-current-plot-pen "default"
 end
 
 
@@ -817,7 +853,7 @@ SLIDER
 22
 317
 195
-351
+350
 max-group-size
 max-group-size
 2
