@@ -1,5 +1,5 @@
 ; -------------------------
-; Zombies vs Humans (NL 6.4) + Efficient Grouping + Spacing + Leader Dedupe
+; Zombies vs Humans (NL 6.4) + Efficient Grouping + Spacing + Leader Dedupe + Fear Factor (with 5-tick decay)
 ; -------------------------
 
 ; breeds
@@ -19,7 +19,7 @@ globals [
   zombie-base-hp
   human-base-damage
 
-  ;; --- counters --
+  ;; --- counters ---
   human-deaths-combat
   zombie-deaths
 
@@ -32,7 +32,6 @@ globals [
   initial-groupers
   alive-loners
   alive-groupers
-
 ]
 
 ; per-breed state
@@ -47,6 +46,10 @@ humans-own  [
   group-id           ;; leader's who (or -1 if ungrouped)
   leader?            ;; am I the leader?
   leader-turtle      ;; reference to leader turtle (or nobody)
+
+  ;; --- fear state ---
+  fear-factor        ;; (zombies seen + missing health − group size) × 2%
+  fear-time          ;; ticks remaining before fear fades (decays to 0 after 5)
 ]
 zombies-own [
   chasing-time
@@ -111,6 +114,42 @@ to go
     ]
 
     if breed = humans [
+
+      ;; -------------------------
+      ;; FEAR FACTOR (computed every human tick)
+      ;; Fear = (Zombies in visual field + Missing health − Group size) × 2%
+      ;; Fades after 5 ticks since last fear stimulus.
+      ;; Color returns to normal when fear fully decays.
+      ;; -------------------------
+
+      let zombies-seen count (zombies in-cone 10 45)
+      let missing-health max (list 0 (human-base-hp - hp))
+      let gsize (ifelse-value (group-id != -1)
+        [ count humans with [ group-id = [group-id] of myself ] ]
+        [ 0 ])
+      let base-fear max (list 0 ((zombies-seen + missing-health - gsize) * 0.02))
+
+      ;; fear only refreshes if zombies are actually seen
+      ifelse zombies-seen > 0 [
+        set fear-factor base-fear
+        set fear-time 5
+        set color magenta + 3   ;; visibly afraid
+      ] [
+        ;; no new stimulus, count down fear timer
+        if fear-time > 0 [
+          set fear-time fear-time - 1
+          ;; optional gradual fade of fear intensity
+          ;; set fear-factor fear-factor * 0.8
+          if fear-time = 0 [
+            set fear-factor 0
+            ;; calm color returns to normal human color
+            ifelse infection-timer > 0 [ set color red + 2 ] [ set color magenta ]
+          ]
+        ]
+      ]
+
+
+
       ;; GROUP BEHAVIOR: spacing + following
       let grouped (group-id != -1 and grouping?)
       if grouped and panic-time = 0 [
@@ -121,7 +160,8 @@ to go
           ;; too close → step away softly
           facexy [xcor] of nearest [ycor] of nearest
           rt 180
-        ] [ if (not leader?) and leader-turtle != nobody and [breed] of leader-turtle = humans [
+        ] [
+          if (not leader?) and leader-turtle != nobody and [breed] of leader-turtle = humans [
             face leader-turtle
           ]
         ]
@@ -137,14 +177,17 @@ to go
         step 0.28
       ]
 
-      ;; flee if zombie in front
+      ;; flee if zombie in front — panic chance scales with fear-factor
       if (who - ticks) mod 5 = 0 [
         let beings-seen turtles in-cone 10 45
           with [ self != myself and breed = zombies ]
         if any? beings-seen [
           lt 157.5 + random-float 45
           set color magenta + 3
-          set panic-time 10
+          ;; only enter panic with probability = fear-factor
+          if random-float 1 < fear-factor [
+            set panic-time 10
+          ]
         ]
       ]
 
@@ -160,6 +203,7 @@ to go
   if ticks mod (group-scan-period * 2) = 0 [ maintain-groups ]
 
   update-grouping-stats
+
   ; stopping conditions
   if count humans = 0 [
     set stop-reason (word "All humans infected at tick " ticks)
@@ -394,6 +438,10 @@ to uninfect
     set group-id -1
     set leader? false
     set leader-turtle nobody
+
+    ;; fear reset
+    set fear-factor 0
+    set fear-time 0
   ]
 
   ; humans → zombies (lowest who)
@@ -478,6 +526,10 @@ to setup-beings
     set leader? false
     set leader-turtle nobody
 
+    ;; fear init
+    set fear-factor 0
+    set fear-time 0
+
     setxy random-xcor random-ycor
     set heading random-float 360
     while [ [pcolor] of patch-here != black ] [ fd 1 ]
@@ -491,10 +543,8 @@ to setup-beings
 
   ;; --- plotting: add two pens on existing plot ---
   set-current-plot "Zombies vs. time"
-  ;; we already do clear-plot above; now add pens for groupers/loners
   create-temporary-plot-pen "groupers"
   create-temporary-plot-pen "loners"
-
 end
 
 to update-grouping-stats
