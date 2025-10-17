@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE experiments SYSTEM "behaviorspace.dtd">
+<experiments>
+  <experiment name="ZombiesVsHumans_ForceStop_1000humans" repetitions="5" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <timeLimit steps="10000"/>
+    <exitCondition>(count humans = 0) or (count zombies = 0) or (ticks &gt;= simulation-time)</exitCondition>
+    <metric>count humans</metric>
+    <metric>count zombies</metric>
+    <metric>human-deaths-combat</metric>
+    <metric>zombie-deaths</metric>
+    <metric>ticks</metric>
+    <metric>initial-loners</metric>
+    <metric>initial-groupers</metric>
+    <metric>alive-loners</metric>
+    <metric>alive-groupers</metric>
+    <runMetricsCondition>(count humans = 0) or (count zombies = 0) or (ticks &gt;= simulation-time)</runMetricsCondition>
+    <enumeratedValueSet variable="force-stop">
+      <value value="true"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="simulation-time">
+      <value value="10000"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="num-humans">
+      <value value="1000"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="num-zombies">
+      <value value="10"/>
+      <value value="25"/>
+      <value value="50"/>
+      <value value="75"/>
+      <value value="100"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max-group-size">
+      <value value="2"/>
+      <value value="6"/>
+      <value value="10"/>
+      <value value="14"/>
+      <value value="18"/>
+      <value value="20"/>
+    </enumeratedValueSet>
+  </experiment>
+</experiments>
