@@ -283,6 +283,10 @@ to go
     set stop-reason (word "All humans infected at tick " ticks)
     stop
   ]
+  if count zombies = 0 [
+    set stop-reason (word "All zombies have died at tick " ticks)
+    stop
+  ]
   if force-stop = true [
     if ticks >= simulation-time [
       set stop-reason (word "Simulation ended by reaching " ticks " ticks")
