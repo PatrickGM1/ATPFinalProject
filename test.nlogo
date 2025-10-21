@@ -147,7 +147,7 @@ to go
 
       ;; -------------------------
       ;; FEAR (0..100)
-      ;; FearComputed = clamp( (zombies-seen + missing-health − group-size) * 2 , 0..100 )
+      ;; FearComputed = clamp(zombies-seen + missing-health − group-size  , 0..100 )
       ;; Refreshes to computed value only when zombies are seen.
       ;; Otherwise decays by 1 every 10 ticks (staggered per who).
       ;; Group fear = average [fear-factor] of group members (0 if ungrouped).
@@ -158,7 +158,7 @@ to go
       let gsize (ifelse-value (group-id != -1)
                    [ count humans with [ group-id = [group-id] of myself ] ]
                    [ 0 ])
-      let computed-fear ((zombies-seen + missing-health - gsize) * 2)
+      let computed-fear (zombies-seen + missing-health - gsize)
       if computed-fear < 0 [ set computed-fear 0 ]
       if computed-fear > 100 [ set computed-fear 100 ]
 
