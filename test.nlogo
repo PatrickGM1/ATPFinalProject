@@ -108,7 +108,7 @@ to go
     if target != nobody [
       ;; start a 10-tick lock only if neither is already locked (avoid resetting timer spam)
       if (lock-ticks = 0) and ([lock-ticks] of target = 0) [
-        set lock-ticks 1000
+        set lock-ticks 10
         ask target [ set lock-ticks 1000 ]
       ]
       zombie-attack target
