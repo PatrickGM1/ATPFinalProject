@@ -357,13 +357,15 @@ end
 to human-attack [z]
   let roll random-float 1
   if roll < p-h-hit [
-    let dmg h-damage
+
+    let dmg human-base-damage - min (list 2.5 (0.5 * floor (fear-factor / 10)))
     ask z [
       set hp hp - dmg
       if hp <= 0 [ die-zombie ]
     ]
   ]
 end
+
 
 to die-human-combat
   set human-deaths-combat human-deaths-combat + 1
@@ -725,6 +727,21 @@ end
 to reset-world
   ca
 end
+
+; -------------------------
+; FEAR MONITORS
+; -------------------------
+to-report mean-fear-loners
+  ifelse any? humans with [ not grouping? ]
+  [ report precision (mean [ fear-factor ] of humans with [ not grouping? ]) 2 ]
+  [ report 0 ]
+end
+
+to-report mean-fear-groupers
+  ifelse any? humans with [ grouping? ]
+  [ report precision (mean [ fear-factor ] of humans with [ grouping? ]) 2 ]
+  [ report 0 ]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
@@ -1082,6 +1099,28 @@ false
 "" ""
 PENS
 "default" 1.0 0 -3508570 true "" "plotxy ticks count humans with [ fear-factor > 0 ]"
+
+MONITOR
+835
+346
+944
+391
+NIL
+mean-fear-loners
+17
+1
+11
+
+MONITOR
+967
+344
+1092
+389
+NIL
+mean-fear-groupers
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
