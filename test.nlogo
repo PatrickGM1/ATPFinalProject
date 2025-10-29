@@ -42,6 +42,9 @@ globals [
   ;; --- fear controls ---
   fear-decay-rate
   fear-decay-interval
+
+  max-mean-fear-loners
+  max-mean-fear-groupers
 ]
 
 ; per-breed state
@@ -150,16 +153,15 @@ to go
       ;; FEAR (0..100)
       ;; FearComputed = clamp(zombies-seen + missing-health − group-size  , 0..100 )
       ;; Refreshes to computed value only when zombies are seen.
-      ;; Otherwise decays by 1 every 10 ticks (staggered per who).
       ;; Group fear = average [fear-factor] of group members (0 if ungrouped).
       ;; Decision uses effective-fear = max(fear-factor, group-fear).
       ;; -------------------------
-      let zombies-seen count (zombies in-cone 10 45)
+      let zombies-seen count (zombies in-cone 10 135)
       let missing-health max (list 0 (human-base-hp - hp))
       let gsize (ifelse-value (group-id != -1)
                    [ count humans with [ group-id = [group-id] of myself ] ]
                    [ 0 ])
-      let computed-fear (zombies-seen + missing-health - gsize)
+      let computed-fear ((zombies-seen * 5) + missing-health - gsize)
       if computed-fear < 0 [ set computed-fear 0 ]
       if computed-fear > 100 [ set computed-fear 100 ]
 
@@ -585,6 +587,9 @@ to setup
   set fear-decay-rate 1
   set fear-decay-interval 50
 
+  set max-mean-fear-loners 0
+  set max-mean-fear-groupers 0
+
   setup-town
   setup-beings
 end
@@ -669,6 +674,11 @@ to update-grouping-stats
 
   ;; (optional) switch back to default pen the zombies line uses
   set-current-plot-pen "default"
+
+  let mfL mean-fear-loners
+  let mfG mean-fear-groupers
+  if mfL > max-mean-fear-loners   [ set max-mean-fear-loners mfL ]
+  if mfG > max-mean-fear-groupers [ set max-mean-fear-groupers mfG ]
 end
 
 
@@ -796,7 +806,7 @@ num-humans
 num-humans
 0
 1000
-25.0
+522.0
 1
 1
 NIL
@@ -1118,6 +1128,28 @@ MONITOR
 389
 NIL
 mean-fear-groupers
+17
+1
+11
+
+MONITOR
+834
+420
+970
+465
+NIL
+max-mean-fear-loners
+17
+1
+11
+
+MONITOR
+975
+421
+1127
+466
+NIL
+max-mean-fear-groupers
 17
 1
 11
