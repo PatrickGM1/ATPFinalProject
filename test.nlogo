@@ -40,7 +40,8 @@ globals [
   alive-groupers
 
   ;; --- fear controls ---
-  fear-decay-rate          ;; fear points lost per decay event (default: 1 every 10 ticks)
+  fear-decay-rate
+  fear-decay-interval
 ]
 
 ; per-breed state
@@ -166,8 +167,7 @@ to go
         ;; refresh immediately on stimulus
         set fear-factor computed-fear
       ] [
-        ;; decay only every 10 ticks; stagger by who for smoother CPU
-        if (ticks + who) mod 10 = 0 [
+        if (ticks mod fear-decay-interval = 0) [
           set fear-factor max (list 0 (fear-factor - fear-decay-rate))
         ]
       ]
@@ -578,12 +578,12 @@ to setup
   set zombie-deaths       0
 
   ;; --- grouping defaults (override with sliders if you want) ---
-  set max-group-size 5
   set group-min-dist 1.2
   set group-scan-period 5
 
   ;; --- fear defaults ---
-  set fear-decay-rate 1     ;; lose 1 fear point every 10 ticks without zombies
+  set fear-decay-rate 1
+  set fear-decay-interval 50
 
   setup-town
   setup-beings
@@ -796,7 +796,7 @@ num-humans
 num-humans
 0
 1000
-262.0
+25.0
 1
 1
 NIL
@@ -811,7 +811,7 @@ num-zombies
 num-zombies
 0
 100
-99.0
+100.0
 1
 1
 NIL
@@ -1032,7 +1032,7 @@ max-group-size
 max-group-size
 2
 20
-5.0
+20.0
 1
 1
 NIL
