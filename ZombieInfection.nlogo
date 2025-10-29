@@ -3,24 +3,73 @@
 ; -------------------------
 
 ; breeds
-breed [ diggers digger ]
+breed [ builders builder ]
 breed [ humans human ]
 breed [ zombies zombie ]
 
-globals [ stop-reason ]
+globals [
+  stop-reason
+
+  ;; combat tunables
+  infection-delay
+  p-z-infect
+  p-z-damage
+  p-h-hit
+  human-base-hp
+  zombie-base-hp
+  human-base-damage
+
+  ;; counters
+  human-deaths-combat
+  zombie-deaths
+
+  ;; grouping controls
+  group-min-dist
+  group-scan-period
+
+  ;; grouping stats (for monitors & plot)
+  initial-loners
+  initial-groupers
+  alive-loners
+  alive-groupers
+
+  ;; fear controls
+  fear-decay-rate
+  fear-decay-interval
+
+  max-mean-fear-loners
+  max-mean-fear-groupers
+]
 
 ; per-breed state
-humans-own  [
+humans-own [
   panic-time
   infection-timer
+  hp
+  h-damage
+
+  ;; grouping state
+  grouping?
+  group-id
+  leader?
+  leader-turtle
+
+  ;; fear state (0..100)
+  fear-factor
+
+  ;; combat/group lock
+  lock-ticks
 ]
+
 zombies-own [
   chasing-time
-  ztype        ; "normal" | "speedy" | "tanky"
-  z-speed      ; movement per tick
-  z-damage     ; reserved for future combat
-  z-health     ; reserved for future combat
-  z-color      ; visual green shade
+  z-speed
+  z-damage
+  z-health
+  hp
+
+  ;; combat lock
+  lock-ticks
 ]
 
 ; -------------------------
@@ -31,85 +80,196 @@ to go
   set-current-plot-pen "default"
   plotxy ticks count zombies
 
-  ; --- zombies ---
+  ;; zombies
   ask zombies [
-    set color z-color
+    set color green
 
-    ifelse chasing-time > 0
-    [ set chasing-time chasing-time - 1 ]
-    [
-      if random 4 = 0 [ set heading random 360 ]
-    ]
-
-    ; only look every 5 ticks, staggered by who number
-    if (who - ticks) mod 5 = 0 [
-      let beings-seen turtles in-cone 10 45 with [ self != myself ]
-      if any? beings-seen [
-        let target one-of beings-seen
-        face target
-        set chasing-time 20
+    ;; movement lock: attacks still allowed while locked
+    ifelse lock-ticks > 0 [
+      set lock-ticks lock-ticks - 1
+    ] [
+      ifelse chasing-time > 0 [
+        set chasing-time chasing-time - 1
+      ] [
+        if random 4 = 0 [ set heading random 360 ]
       ]
+
+      if (who - ticks) mod 5 = 0 [
+        let beings-seen turtles in-cone 10 45 with [ self != myself ]
+        if any? beings-seen [
+          let target one-of beings-seen
+          face target
+          set chasing-time 20
+        ]
+      ]
+      step z-speed
     ]
 
-    ; move by per-type speed
-    step z-speed
-
-    ; infect any humans on the same patch
-    ask humans-here [
-      if infection-timer = 0 [
-        set infection-timer 200           ; infection delay (in ticks)
-        set color red + 2                ; light red to show bitten
+    ;; attacks (allowed even while locked)
+    let target one-of humans-here
+    if target != nobody [
+      ;; start a 10-tick lock only if neither already locked
+      if (lock-ticks = 0) and ([lock-ticks] of target = 0) [
+        set lock-ticks 10
+        ask target [ set lock-ticks 1000 ]
+      ]
+      zombie-attack target
+      if target != nobody and [breed] of target = humans [
+        ask target [ human-attack myself ]
       ]
     ]
   ]
 
-  ; --- humans ---
+  ;; group lock propagation (whole group freezes together)
+  propagate-group-locks
+
+  ;; humans
   ask humans [
-    ; infection progression first
+    ;; infection progression
     if infection-timer > 0 [
       set infection-timer infection-timer - 1
       if infection-timer = 0 [
-        ; transform now
+        ;; leave any group on turn
+        set leader? false
+        set group-id -1
+        set leader-turtle nobody
+
         set breed zombies
         set chasing-time 0
-        init-zombie-type
-        set color z-color
+        set z-speed 0.20
+        set z-damage 2.0
+        set z-health 1.0
+        set color green
+        set hp zombie-base-hp * z-health
+        set lock-ticks 0
       ]
     ]
 
-    ; After possible transform, only run human behavior if still human
     if breed = humans [
-      step 0.22  ; normal human speed
+      ;; -------------------------
+      ;; fear update (0..100)
+      ;; -------------------------
+      let zombies-seen count (zombies in-cone 10 135)
+      let missing-health max (list 0 (human-base-hp - hp))
+      let gsize (ifelse-value (group-id != -1)
+                   [ count humans with [ group-id = [group-id] of myself ] ]
+                   [ 0 ])
+      let computed-fear ((zombies-seen * 5) + missing-health - gsize)
+      if computed-fear < 0 [ set computed-fear 0 ]
+      if computed-fear > 100 [ set computed-fear 100 ]
 
-      if panic-time > 0 [
-        set panic-time panic-time - 1
-        if panic-time = 0 [
-          ; return to correct color after panic ends
-          ifelse infection-timer > 0 [
-            set color red + 2            ; still infected, back to light red
-          ] [
-            set color magenta            ; not infected, normal human
+      ifelse zombies-seen > 0 [
+        set fear-factor computed-fear
+      ] [
+        if (ticks mod fear-decay-interval = 0) [
+          set fear-factor max (list 0 (fear-factor - fear-decay-rate))
+        ]
+      ]
+
+      ;; group average fear (0 if ungrouped)
+      let group-fear (ifelse-value (group-id != -1)
+                        [ mean [fear-factor] of humans with [ group-id = [group-id] of myself ] ]
+                        [ 0 ])
+      let effective-fear max list fear-factor group-fear
+
+      ;; visual tint (leaders recolored later)
+      ifelse fear-factor > 0 [
+        set color magenta + 3
+      ] [
+        ifelse infection-timer > 0 [ set color red + 2 ] [ set color magenta ]
+      ]
+
+      ;; group behavior (spacing + following; disabled while locked or panicking)
+      let grouped (group-id != -1 and grouping?)
+      if grouped and panic-time = 0 and lock-ticks = 0 [
+        let mates other humans with [ group-id = [group-id] of myself ]
+        let nearest nobody
+        if any? mates [ set nearest min-one-of mates [ distance myself ] ]
+        ifelse nearest != nobody and distance nearest < group-min-dist [
+          ;; too close → step away
+          facexy [xcor] of nearest [ycor] of nearest
+          rt 180
+        ] [
+          if (not leader?) and leader-turtle != nobody and [breed] of leader-turtle = humans [
+            face leader-turtle
           ]
         ]
-        step 0.28  ; panicked humans move faster for this tick too
       ]
 
-      ; look ahead only every 5 ticks, staggered by who
-      if (who - ticks) mod 5 = 0 [
-        let beings-seen turtles in-cone 10 45
-          with [ self != myself and (breed = zombies or (breed = humans and panic-time > 0)) ]
-        if any? beings-seen [
-          lt 157.5 + random-float 45
-          set color magenta + 3
-          set panic-time 10
+      ;; base movement (suppressed while locked)
+      ifelse lock-ticks = 0 [
+        step 0.22
+      ] [
+        set lock-ticks lock-ticks - 1
+      ]
+
+      ;; panic movement while fear high
+      if panic-time > 0 [
+        ifelse effective-fear > 50 [
+          if lock-ticks = 0 [
+            let nearby-zombies zombies in-radius 12
+            if any? nearby-zombies [
+              let zt min-one-of nearby-zombies [ distance myself ]
+              if zt != nobody [
+                face zt
+                rt 180
+              ]
+            ]
+            step 0.32
+          ]
+        ] [
+          set panic-time 0
+          ifelse infection-timer > 0 [ set color red + 2 ] [ set color magenta ]
         ]
       ]
+
+      ;; stand vs flee when a zombie is in front (checked ~every 5 ticks)
+      if lock-ticks = 0 and ((who - ticks) mod 5 = 0) [
+        let zfront turtles in-cone 10 45 with [ self != myself and breed = zombies ]
+        ifelse any? zfront [
+          ifelse effective-fear > 50 [
+            ;; flee
+            let zt min-one-of zfront [ distance myself ]
+            ifelse zt != nobody [
+              face zt
+              rt 180
+            ] [
+              lt 150 + random-float 60
+            ]
+            set color magenta + 3
+            set panic-time 1
+          ] [
+            ;; brace (fight only on collision)
+            set panic-time 0
+          ]
+        ] [
+          if effective-fear <= 50 [ set panic-time 0 ]
+        ]
+      ]
+
+      if leader? [ set color cyan ]
     ]
   ]
 
-  ; stopping conditions
+  ;; grouping cadence & upkeep
+  if ticks mod group-scan-period = 0 [ manage-grouping ]
+  dedupe-leaders
+  if ticks mod (group-scan-period * 2) = 0 [ maintain-groups ]
+
+  update-grouping-stats
+
+  ;; feared humans plot (>50)
+  set-current-plot "Feared vs. time"
+  set-current-plot-pen "feared"
+  plotxy ticks count humans with [ fear-factor > 50 ]
+
+  ;; stopping conditions
   if count humans = 0 [
     set stop-reason (word "All humans infected at tick " ticks)
+    stop
+  ]
+  if count zombies = 0 [
+    set stop-reason (word "All zombies have died at tick " ticks)
     stop
   ]
   if force-stop = true [
@@ -120,18 +280,27 @@ to go
   ]
 
   tick
-  wait 0.01
 end
 
-
+; -------------------------
+; lock propagation (group-wide)
+; -------------------------
+to propagate-group-locks
+  let gids remove-duplicates [ group-id ] of humans with [ group-id != -1 ]
+  foreach gids [ gid ->
+    let members humans with [ group-id = gid ]
+    let maxlock max [lock-ticks] of members
+    if maxlock > 0 [
+      ask members [ set lock-ticks max (list lock-ticks maxlock) ]
+    ]
+  ]
+end
 
 ; -------------------------
 ; motion helper (avoid walls)
-; dist should be <= 1 to avoid tunneling
 ; -------------------------
 to step [dist]
   if [pcolor] of patch-ahead dist != black [
-    ; turn to face the black neighbor closest to where we *would* have gone
     let x dx + xcor
     let y dy + ycor
     face min-one-of neighbors4 with [ pcolor = black ] [ distancexy x y ]
@@ -140,79 +309,273 @@ to step [dist]
 end
 
 ; -------------------------
-; assign a random zombie type (called on spawn & on infection)
+; combat helpers
 ; -------------------------
-to init-zombie-type
-  let r random-float 1
-  if r < 0.5 [
-    ; NORMAL: baseline stats, mid green
-    set ztype   "normal"
-    set z-speed 0.20
-    set z-damage 1.0
-    set z-health 1.0
-    set z-color green
+to zombie-attack [h]
+  let roll random-float 1
+  let dmg z-damage
+
+  if roll < p-z-infect [
+    ask h [
+      if infection-timer = 0 [
+        set infection-timer infection-delay
+        set color red + 2
+      ]
+      set hp hp - dmg
+      if hp <= 0 [ die-human-combat ]
+    ]
   ]
-  if r >= 0.5 and r < 0.8 [
-    ; SPEEDY: faster but less damage, lighter green
-    set ztype   "speedy"
-    set z-speed 0.25
-    set z-damage 0.6
-    set z-health 1.0
-    set z-color green + 2
+  if roll >= p-z-infect and roll < (p-z-infect + p-z-damage) [
+    ask h [
+      set hp hp - dmg
+      if hp <= 0 [ die-human-combat ]
+    ]
   ]
-  if r >= 0.8 [
-    ; TANKY: slower, less health, darker green
-    set ztype   "tanky"
-    set z-speed 0.15
-    set z-damage 1.0
-    set z-health 0.7
-    set z-color green - 2
+end
+
+to human-attack [z]
+  let roll random-float 1
+  if roll < p-h-hit [
+    let dmg human-base-damage - min (list 2.5 (0.5 * floor (fear-factor / 10)))
+    ask z [
+      set hp hp - dmg
+      if hp <= 0 [ die-zombie ]
+    ]
+  ]
+end
+
+to die-human-combat
+  set human-deaths-combat human-deaths-combat + 1
+  die
+end
+
+to die-zombie
+  set zombie-deaths zombie-deaths + 1
+  die
+end
+
+; -------------------------
+; grouping (radius-based)
+; -------------------------
+to manage-grouping
+  ask humans with [ grouping? and ((who + ticks) mod group-scan-period = 0) ] [
+    let local humans in-radius 1 with [ grouping? ]
+    if any? local [
+      let cluster (turtle-set self local)
+      if count cluster >= 2 [
+        ;; choose leader (existing preferred, else lowest who)
+        let L one-of (cluster with [ leader? ])
+        if L = nobody [ set L min-one-of cluster [ who ] ]
+
+        ask L [
+          set leader? true
+          set group-id who
+          set leader-turtle self
+          set color cyan
+        ]
+
+        let gid [who] of L
+        let current count humans with [ breed = humans and group-id = gid ]
+        let space max (list 0 (max-group-size - current))
+
+        let pool (cluster with [ self != L and group-id != gid ])
+        if any? pool and space > 0 [
+          let n min (list space count pool)
+          ask n-of n pool [
+            set group-id gid
+            set leader-turtle L
+            set leader? false
+          ]
+        ]
+      ]
+    ]
   ]
 end
 
 ; -------------------------
-; “uninfect” (reset mix to slider value)
+; leader dedupe
+; -------------------------
+to dedupe-leaders
+  let merge-radius 1.5
+  ask humans with [ leader? ] [
+    let the-winner self
+    let rivals other humans in-radius merge-radius with
+               [ leader? and who > [who] of the-winner ]
+    if any? rivals [
+      ask rivals [
+        let rid who
+        set leader? false
+        set group-id [who] of the-winner
+        set leader-turtle the-winner
+        ifelse infection-timer > 0 [ set color red + 2 ] [ set color magenta ]
+        ask humans with [ group-id = rid ] [
+          set group-id [who] of the-winner
+          set leader? false
+          set leader-turtle the-winner
+          ifelse infection-timer > 0 [ set color red + 2 ] [ set color magenta ]
+        ]
+      ]
+    ]
+  ]
+end
+
+; -------------------------
+; group upkeep
+; -------------------------
+to maintain-groups
+  ;; a real leader must have group-id = who
+  ask humans with [ leader? and group-id != who ] [
+    set leader? false
+    ifelse infection-timer > 0 [ set color red + 2 ] [ set color magenta ]
+  ]
+
+  ;; clear followers with missing/invalid leader
+  ask humans with [ leader-turtle != nobody ] [
+    if [breed] of leader-turtle != humans [
+      set leader-turtle nobody
+      set group-id -1
+      set leader? false
+      ifelse infection-timer > 0 [ set color red + 2 ] [ set color magenta ]
+    ]
+  ]
+
+  let gids remove-duplicates [ group-id ] of humans with [ group-id != -1 ]
+  foreach gids [ gid ->
+    let members humans with [ group-id = gid ]
+    if count members <= 1 [
+      ask members [
+        set group-id -1
+        set leader? false
+        set leader-turtle nobody
+        ifelse infection-timer > 0 [ set color red + 2 ] [ set color magenta ]
+      ]
+    ]
+    if count members > 1 [
+      let newleader min-one-of members [ who ]
+      ask newleader [
+        set leader? true
+        set leader-turtle self
+        set group-id who
+        set color cyan
+      ]
+      ask members with [ self != newleader ] [
+        set leader? false
+        set leader-turtle newleader
+        set group-id [who] of newleader
+      ]
+      ;; cap size (protect leader)
+      let overflow max (list 0 (count members - max-group-size))
+      if overflow > 0 [
+        let to-unassign n-of overflow (members with [ not leader? ])
+        ask to-unassign [
+          set group-id -1
+          set leader? false
+          set leader-turtle nobody
+          ifelse infection-timer > 0 [ set color red + 2 ] [ set color magenta ]
+        ]
+      ]
+    ]
+  ]
+end
+
+; -------------------------
+; uninfect (reset mix to slider value)
 ; -------------------------
 to uninfect
-  ; reduce zombies to num-zombies by flipping the higher who #s back to humans
+  ;; zombies → humans (higher who back to human)
   ask zombies with [ who >= num-zombies ] [
     set breed humans
     set panic-time 0
     set color magenta
+    set infection-timer 0
+    set hp human-base-hp
+    set h-damage human-base-damage
+
+    ;; grouping init
+    set grouping? (random 2 = 0)
+    set group-id -1
+    set leader? false
+    set leader-turtle nobody
+
+    ;; fear reset
+    set fear-factor 0
+    set lock-ticks 0
   ]
-  ; if the slider was increased, promote the lowest who # humans to zombies
+
+  ;; humans → zombies (lowest who)
   ask humans with [ who < num-zombies ] [
+    set leader? false
+    set group-id -1
+    set leader-turtle nobody
+
     set breed zombies
     set chasing-time 0
-    init-zombie-type
-    set color z-color
+    set z-speed 0.20
+    set z-damage 2.0
+    set z-health 1.0
+    set color green
+    set infection-timer 0
+    set hp zombie-base-hp * z-health
+    set lock-ticks 0
   ]
 end
 
 ; -------------------------
-; setup wrappers
+; setup
 ; -------------------------
 to setup
   set stop-reason ""
+
+  ;; combat defaults
+  set infection-delay     200
+  set p-z-infect          0.30
+  set p-z-damage          0.50
+  set p-h-hit             0.55
+  set human-base-hp       20
+  set zombie-base-hp      10
+  set human-base-damage   5.0
+
+  set human-deaths-combat 0
+  set zombie-deaths       0
+
+  ;; grouping defaults
+  set group-min-dist 1.2
+  set group-scan-period 5
+
+  ;; fear defaults
+  set fear-decay-rate 1
+  set fear-decay-interval 50
+
+  set max-mean-fear-loners 0
+  set max-mean-fear-groupers 0
+
   setup-town
   setup-beings
 end
 
+; -------------------------
+; beings setup
+; -------------------------
 to setup-beings
   clear-turtles
 
+  ;; plot: Zombies vs. time
   set-current-plot "Zombies vs. time"
   clear-plot
   set-plot-x-range 0 1000
   set-plot-y-range 0 (num-humans + num-zombies)
   reset-ticks
 
-  ; zombies get earliest who numbers (relied on by uninfect)
+  ;; zombies get earliest who numbers (relied on by uninfect)
   create-zombies num-zombies [
     set size 4
     set chasing-time 0
-    init-zombie-type
-    set color z-color
+    set z-speed 0.20
+    set z-damage 2.0
+    set z-health 1.0
+    set color green
+    set hp zombie-base-hp * z-health
+    set lock-ticks 0
     setxy random-xcor random-ycor
     set heading random-float 360
     while [ [pcolor] of patch-here != black ] [ fd 1 ]
@@ -223,10 +586,61 @@ to setup-beings
     set panic-time 0
     set infection-timer 0
     set color magenta
+    set hp human-base-hp
+    set h-damage human-base-damage
+
+    ;; grouping init (50/50)
+    set grouping? (random 2 = 0)
+    set group-id -1
+    set leader? false
+    set leader-turtle nobody
+
+    ;; fear init
+    set fear-factor 0
+    set lock-ticks 0
+
     setxy random-xcor random-ycor
     set heading random-float 360
     while [ [pcolor] of patch-here != black ] [ fd 1 ]
   ]
+
+  ;; grouping stats at spawn
+  set initial-groupers count humans with [ grouping? ]
+  set initial-loners   count humans with [ not grouping? ]
+  set alive-groupers initial-groupers
+  set alive-loners   initial-loners
+
+  ;; add pens to existing plot
+  set-current-plot "Zombies vs. time"
+  create-temporary-plot-pen "groupers"
+  create-temporary-plot-pen "loners"
+
+  ;; plot: Feared vs. time (>50)
+  set-current-plot "Feared vs. time"
+  clear-plot
+  set-plot-x-range 0 1000
+  set-plot-y-range 0 num-humans
+  create-temporary-plot-pen "feared"
+end
+
+; -------------------------
+; grouping stats
+; -------------------------
+to update-grouping-stats
+  set alive-groupers count humans with [ grouping? ]
+  set alive-loners   count humans with [ not grouping? ]
+
+  set-current-plot "Zombies vs. time"
+  set-current-plot-pen "groupers"
+  plotxy ticks alive-groupers
+  set-current-plot-pen "loners"
+  plotxy ticks alive-loners
+  set-current-plot-pen "default"
+
+  let mfL mean-fear-loners
+  let mfG mean-fear-groupers
+  if mfL > max-mean-fear-loners   [ set max-mean-fear-loners mfL ]
+  if mfG > max-mean-fear-groupers [ set max-mean-fear-groupers mfG ]
 end
 
 ; -------------------------
@@ -234,25 +648,22 @@ end
 ; -------------------------
 to setup-town
   clear-patches
-  ask patches [ set pcolor gray - 3 ]  ; buildings
+  ask patches [ set pcolor gray - 3 ]  ;; buildings
 
-  ;; carve alleyways with paired diggers so we avoid dead ends
   clear-turtles
-  create-diggers 112
+  create-builders 112
 
-  ; place digger pairs back-to-back on the grid and align to 90° headings
-  ask diggers with [ who mod 2 = 0 ] [
+  ask builders with [ who mod 2 = 0 ] [
     setxy random-xcor random-ycor
     set heading 90 * random 4
   ]
-  ask diggers with [ who mod 2 = 1 ] [
+  ask builders with [ who mod 2 = 1 ] [
     setxy [xcor] of turtle (who - 1) [ycor] of turtle (who - 1)
     set heading (180 + [heading] of turtle (who - 1))
     fd 1
   ]
 
-  ; each digger walks, carving black corridors, randomly turning by 90° or 270°
-  ask diggers [
+  ask builders [
     while [ [pcolor] of patch-here != black ] [
       set pcolor black
       fd 1
@@ -262,9 +673,8 @@ to setup-town
     ]
   ]
 
-  ;; carve plazas (squares)
   clear-turtles
-  create-diggers 56 [
+  create-builders 56 [
     setxy random-xcor random-ycor
     let xsize 2 + random 60
     let ysize 2 + random 60
@@ -277,7 +687,6 @@ to setup-town
 
   clear-turtles
 
-  ; fake non-wrapping by turning outer ring back into buildings
   if not wrap? [
     ask patches with [ pxcor = max-pxcor or pxcor = min-pxcor ] [ set pcolor gray - 3 ]
     ask patches with [ pycor = max-pycor or pycor = min-pycor ] [ set pcolor gray - 3 ]
@@ -286,8 +695,26 @@ to setup-town
   reset-ticks
 end
 
+; -------------------------
+; world reset
+; -------------------------
 to reset-world
   ca
+end
+
+; -------------------------
+; fear monitors (reporters)
+; -------------------------
+to-report mean-fear-loners
+  ifelse any? humans with [ not grouping? ]
+  [ report precision (mean [ fear-factor ] of humans with [ not grouping? ]) 2 ]
+  [ report 0 ]
+end
+
+to-report mean-fear-groupers
+  ifelse any? humans with [ grouping? ]
+  [ report precision (mean [ fear-factor ] of humans with [ grouping? ]) 2 ]
+  [ report 0 ]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -343,7 +770,7 @@ num-humans
 num-humans
 0
 1000
-26.0
+522.0
 1
 1
 NIL
@@ -358,17 +785,17 @@ num-zombies
 num-zombies
 0
 100
-99.0
+100.0
 1
 1
 NIL
 HORIZONTAL
 
 SWITCH
-21
-310
-124
-343
+24
+379
+127
+412
 wrap?
 wrap?
 1
@@ -410,10 +837,10 @@ NIL
 1
 
 BUTTON
-21
-362
-104
-395
+24
+431
+107
+464
 NIL
 uninfect
 NIL
@@ -460,10 +887,10 @@ count humans with [ panic-time > 0 ]
 11
 
 PLOT
-1089
-20
-1694
-496
+1158
+21
+1589
+317
 Zombies vs. time
 Time
 Zombies
@@ -495,10 +922,10 @@ NIL
 1
 
 BUTTON
-20
-411
-125
-444
+23
+480
+128
+513
 NIL
 reset-world
 NIL
@@ -547,6 +974,149 @@ simulation-time
 1
 NIL
 HORIZONTAL
+
+MONITOR
+832
+149
+970
+194
+NIL
+human-deaths-combat
+17
+1
+11
+
+MONITOR
+982
+149
+1076
+194
+NIL
+zombie-deaths
+17
+1
+11
+
+SLIDER
+22
+317
+195
+350
+max-group-size
+max-group-size
+2
+20
+20.0
+1
+1
+NIL
+HORIZONTAL
+
+MONITOR
+834
+214
+924
+259
+NIL
+initial-loners
+17
+1
+11
+
+MONITOR
+952
+215
+1061
+260
+NIL
+initial-groupers
+17
+1
+11
+
+MONITOR
+834
+280
+918
+325
+NIL
+alive-loners
+17
+1
+11
+
+MONITOR
+952
+277
+1055
+322
+NIL
+alive-groupers
+17
+1
+11
+
+PLOT
+1132
+331
+1598
+659
+Feared vs. time
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -3508570 true "" "plotxy ticks count humans with [ fear-factor > 0 ]"
+
+MONITOR
+835
+346
+944
+391
+NIL
+mean-fear-loners
+17
+1
+11
+
+MONITOR
+967
+344
+1092
+389
+NIL
+mean-fear-groupers
+17
+1
+11
+
+MONITOR
+834
+420
+970
+465
+NIL
+max-mean-fear-loners
+17
+1
+11
+
+MONITOR
+975
+421
+1127
+466
+NIL
+max-mean-fear-groupers
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -894,6 +1464,48 @@ NetLogo 6.4.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
+<experiments>
+  <experiment name="ZombiesVsHumans_ForceStop_new1000humans" repetitions="5" runMetricsEveryStep="false">
+    <setup>setup</setup>
+    <go>go</go>
+    <timeLimit steps="10000"/>
+    <exitCondition>(count humans = 0) or (count zombies = 0) or (ticks &gt;= simulation-time)</exitCondition>
+    <metric>count humans</metric>
+    <metric>count zombies</metric>
+    <metric>human-deaths-combat</metric>
+    <metric>zombie-deaths</metric>
+    <metric>ticks</metric>
+    <metric>initial-loners</metric>
+    <metric>initial-groupers</metric>
+    <metric>alive-loners</metric>
+    <metric>alive-groupers</metric>
+    <runMetricsCondition>(count humans = 0) or (count zombies = 0) or (ticks &gt;= simulation-time)</runMetricsCondition>
+    <enumeratedValueSet variable="force-stop">
+      <value value="true"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="simulation-time">
+      <value value="10000"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="num-humans">
+      <value value="1000"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="num-zombies">
+      <value value="10"/>
+      <value value="25"/>
+      <value value="50"/>
+      <value value="75"/>
+      <value value="100"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max-group-size">
+      <value value="2"/>
+      <value value="6"/>
+      <value value="10"/>
+      <value value="14"/>
+      <value value="18"/>
+      <value value="20"/>
+    </enumeratedValueSet>
+  </experiment>
+</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default
