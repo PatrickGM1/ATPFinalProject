@@ -3,74 +3,75 @@
 ; -------------------------
 
 ; breeds
-breed [ builders builder ]
-breed [ humans human ]
-breed [ zombies zombie ]
+breed [ builders builder ]  ; temporary map-carving agents for town setup
+breed [ humans human ]      ; human agents (susceptible/fighting/fleeing)
+breed [ zombies zombie ]    ; zombie agents (infecting/chasing)
 
 globals [
-  stop-reason
+  stop-reason              ; text reason shown when the simulation stops
 
   ;; combat tunables
-  infection-delay
-  p-z-infect
-  p-z-damage
-  p-h-hit
-  human-base-hp
-  zombie-base-hp
-  human-base-damage
+  infection-delay          ; ticks from infection to turning into a zombie
+  p-z-infect               ; probability a zombie attack causes infection
+  p-z-damage               ; probability a zombie attack deals damage w/o infection
+  p-h-hit                  ; probability a human attack lands
+  human-base-hp            ; starting hit points for humans
+  zombie-base-hp           ; starting hit points for zombies
+  human-base-damage        ; base damage per successful human hit
 
   ;; counters
-  human-deaths-combat
-  zombie-deaths
+  human-deaths-combat      ; number of humans killed by damage (not infection timer)
+  zombie-deaths            ; number of zombies killed
 
   ;; grouping controls
-  group-min-dist
-  group-scan-period
+  group-min-dist           ; minimum preferred spacing between grouped humans
+  group-scan-period        ; ticks between grouping scans/assignments
 
   ;; grouping stats (for monitors & plot)
-  initial-loners
-  initial-groupers
-  alive-loners
-  alive-groupers
+  initial-loners           ; humans that spawned ungrouped
+  initial-groupers         ; humans that spawned opted into grouping
+  alive-loners             ; current alive ungrouped humans
+  alive-groupers           ; current alive grouped humans
 
   ;; fear controls
-  fear-decay-rate
-  fear-decay-interval
+  fear-decay-rate          ; amount fear decreases on each decay step
+  fear-decay-interval      ; ticks between fear decay steps
 
-  max-mean-fear-loners
-  max-mean-fear-groupers
+  max-mean-fear-loners     ; max observed mean fear among loners (for display)
+  max-mean-fear-groupers   ; max observed mean fear among groupers (for display)
 ]
 
 ; per-breed state
 humans-own [
-  panic-time
-  infection-timer
-  hp
-  h-damage
+  panic-time               ; ticks remaining of panic/flee behavior
+  infection-timer          ; ticks left until turning after infection
+  hp                       ; current hit points
+  h-damage                 ; current human damage (may be adjusted by fear)
 
   ;; grouping state
-  grouping?
-  group-id
-  leader?
-  leader-turtle
+  grouping?                ; true if this human participates in groups
+  group-id                 ; identifier of the group (leader's who), -1 if none
+  leader?                  ; true if this human is the group leader
+  leader-turtle            ; agent reference to the current leader
 
   ;; fear state (0..100)
-  fear-factor
+  fear-factor              ; current individual fear level (0–100)
 
   ;; combat/group lock
-  lock-ticks
+  lock-ticks               ; ticks remaining locked (combat or group propagation)
 ]
 
 zombies-own [
-  chasing-time
-  z-speed
-  z-damage
-  z-health
-  hp
+  chasing-time             ; ticks remaining to keep chasing current heading/target
+  z-speed                  ; zombie movement speed
+  z-damage                 ; zombie damage per successful attack
+  z-health                 ; zombie health multiplier (scales base HP)
+  hp                       ; current hit points
 
   ;; combat lock
-  lock-ticks
+  lock-ticks               ; ticks remaining locked during/after combat
 ]
+
 
 ; -------------------------
 ; main loop
@@ -770,7 +771,7 @@ num-humans
 num-humans
 0
 1000
-522.0
+204.0
 1
 1
 NIL
@@ -785,7 +786,7 @@ num-zombies
 num-zombies
 0
 100
-100.0
+13.0
 1
 1
 NIL
