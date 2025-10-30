@@ -343,6 +343,7 @@ to zombie-attack [h]
   ]
 end
 
+; human counter-attack during zombie encounter (damage reduced by fear level)
 to human-attack [z]
   let roll random-float 1
   if roll < p-h-hit [
@@ -354,11 +355,13 @@ to human-attack [z]
   ]
 end
 
+; human dies from combat damage (not infection)
 to die-human-combat
   set human-deaths-combat human-deaths-combat + 1
   die
 end
 
+; zombie dies from human attacks
 to die-zombie
   set zombie-deaths zombie-deaths + 1
   die
