@@ -771,10 +771,10 @@ ticks
 30.0
 
 BUTTON
-27
-16
-90
-49
+11
+331
+74
+364
 NIL
 go
 T
@@ -788,10 +788,10 @@ NIL
 1
 
 SLIDER
-22
-207
-194
-240
+15
+20
+187
+53
 num-humans
 num-humans
 0
@@ -803,10 +803,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-21
-257
-193
-290
+15
+75
+187
+108
 num-zombies
 num-zombies
 0
@@ -818,10 +818,10 @@ NIL
 HORIZONTAL
 
 SWITCH
-24
-379
-127
-412
+16
+129
+119
+162
 wrap?
 wrap?
 1
@@ -829,10 +829,10 @@ wrap?
 -1000
 
 BUTTON
-25
-63
-92
-96
+11
+182
+78
+215
 NIL
 setup
 NIL
@@ -846,10 +846,10 @@ NIL
 1
 
 BUTTON
-25
-111
-139
-144
+10
+231
+124
+264
 NIL
 setup-beings
 NIL
@@ -863,10 +863,10 @@ NIL
 1
 
 BUTTON
-24
-431
-107
-464
+11
+441
+94
+474
 NIL
 uninfect
 NIL
@@ -931,10 +931,10 @@ PENS
 "default" 1.0 2 -14439633 true "" "plot count turtles"
 
 BUTTON
-25
-158
-128
-191
+10
+279
+113
+312
 NIL
 setup-town
 NIL
@@ -948,10 +948,10 @@ NIL
 1
 
 BUTTON
-23
-480
-128
-513
+10
+490
+115
+523
 NIL
 reset-world
 NIL
@@ -1024,10 +1024,10 @@ zombie-deaths
 11
 
 SLIDER
-22
-317
-195
-350
+10
+388
+183
+421
 max-group-size
 max-group-size
 2
@@ -1088,8 +1088,8 @@ PLOT
 1598
 659
 Feared vs. time
-NIL
-NIL
+Time (ticks)
+Number of humans with fear > 50
 0.0
 10.0
 0.0
