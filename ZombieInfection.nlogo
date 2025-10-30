@@ -89,6 +89,7 @@ to go
     ifelse lock-ticks > 0 [
       set lock-ticks lock-ticks - 1
     ] [
+      ; ===== Code from original model START =====
       ifelse chasing-time > 0 [
         set chasing-time chasing-time - 1
       ] [
@@ -103,6 +104,8 @@ to go
           set chasing-time 20
         ]
       ]
+      ; ===== Code from original model END =====
+
       step z-speed
     ]
 
@@ -205,6 +208,7 @@ to go
       ]
 
       ;; panic movement while fear high
+      ; ===== Code from original model START =====
       if panic-time > 0 [
         ifelse effective-fear > 50 [
           if lock-ticks = 0 [
@@ -223,8 +227,10 @@ to go
           ifelse infection-timer > 0 [ set color red + 2 ] [ set color magenta ]
         ]
       ]
+      ; ===== Code from original model END =====
 
       ;; stand vs flee when a zombie is in front (checked ~every 5 ticks)
+      ; ===== Code from original model START =====
       if lock-ticks = 0 and ((who - ticks) mod 5 = 0) [
         let zfront turtles in-cone 10 45 with [ self != myself and breed = zombies ]
         ifelse any? zfront [
@@ -247,6 +253,7 @@ to go
           if effective-fear <= 50 [ set panic-time 0 ]
         ]
       ]
+      ; ===== Code from original model END =====
 
       if leader? [ set color cyan ]
     ]
@@ -300,6 +307,7 @@ end
 ; -------------------------
 ; motion helper (avoid walls)
 ; -------------------------
+; ===== Code from original model START =====
 to step [dist]
   if [pcolor] of patch-ahead dist != black [
     let x dx + xcor
@@ -308,6 +316,7 @@ to step [dist]
   ]
   fd dist
 end
+; ===== Code from original model END =====
 
 ; -------------------------
 ; combat helpers
@@ -485,7 +494,11 @@ end
 to uninfect
   ;; zombies → humans (higher who back to human)
   ask zombies with [ who >= num-zombies ] [
+    ; ===== Code from original model START =====
     set breed humans
+    set color magenta
+    ; ===== Code from original model END =====
+
     set panic-time 0
     set color magenta
     set infection-timer 0
@@ -509,12 +522,15 @@ to uninfect
     set group-id -1
     set leader-turtle nobody
 
+    ; ===== Code from original model START =====
     set breed zombies
+    set color green
+    ; ===== Code from original model END =====
+
     set chasing-time 0
     set z-speed 0.20
     set z-damage 2.0
     set z-health 1.0
-    set color green
     set infection-timer 0
     set hp zombie-base-hp * z-health
     set lock-ticks 0
@@ -550,8 +566,10 @@ to setup
   set max-mean-fear-loners 0
   set max-mean-fear-groupers 0
 
+  ; ===== Code from original model START =====
   setup-town
   setup-beings
+  ; ===== Code from original model END =====
 end
 
 ; -------------------------
@@ -579,7 +597,9 @@ to setup-beings
     set lock-ticks 0
     setxy random-xcor random-ycor
     set heading random-float 360
+    ; ===== Code from original model START =====
     while [ [pcolor] of patch-here != black ] [ fd 1 ]
+    ; ===== Code from original model END =====
   ]
 
   create-humans num-humans [
@@ -602,7 +622,9 @@ to setup-beings
 
     setxy random-xcor random-ycor
     set heading random-float 360
+    ; ===== Code from original model START =====
     while [ [pcolor] of patch-here != black ] [ fd 1 ]
+    ; ===== Code from original model END =====
   ]
 
   ;; grouping stats at spawn
@@ -647,8 +669,10 @@ end
 ; -------------------------
 ; city carving
 ; -------------------------
+; ===== Code from original model START =====
 to setup-town
   clear-patches
+
   ask patches [ set pcolor gray - 3 ]  ;; buildings
 
   clear-turtles
@@ -693,9 +717,10 @@ to setup-town
     ask patches with [ pycor = max-pycor or pycor = min-pycor ] [ set pcolor gray - 3 ]
   ]
 
+
   reset-ticks
 end
-
+  ; ===== Code from original model END =====
 ; -------------------------
 ; world reset
 ; -------------------------
