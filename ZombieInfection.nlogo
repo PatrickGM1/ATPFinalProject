@@ -158,9 +158,7 @@ to go
       let gsize (ifelse-value (group-id != -1)
                    [ count humans with [ group-id = [group-id] of myself ] ]
                    [ 0 ])
-      let computed-fear ((zombies-seen * 5) + missing-health - gsize)
-      if computed-fear < 0 [ set computed-fear 0 ]
-      if computed-fear > 100 [ set computed-fear 100 ]
+      let computed-fear max (list 0 (min (list 100 ((zombies-seen * 5) + missing-health - gsize))))
 
       ifelse zombies-seen > 0 [
         set fear-factor computed-fear
